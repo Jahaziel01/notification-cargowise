@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model PreAlert {
+  id              Int            @id @default(autoincrement())
+  messageKey      String         @unique @db.VarChar(255)
+  type            String         @default("PRE_ALERT")
+  shipment        String         @unique @db.VarChar(255)
+  subject         String         @unique @db.VarChar(255)
+  recipients      String         @db.MediumText
+  cc              String         @db.MediumText
+  consol          String         @db.VarChar(255)
+  retries         Int            @default(0)
+  updates         Int            @default(0)
+  user            String?        @db.VarChar(255)
+  isAnswered      Boolean        @default(false)
+  closed          Boolean        @default(false)
+  description     String?        @db.LongText
+  json            Json?
+  answeredBy      String?        @db.VarChar(255)
+  etaAt           DateTime?
+  answeredAt      DateTime?
+  arrivalNoticeId Int?           @unique
+  arrivalNotice   ArrivalNotice? @relation(fields: [arrivalNoticeId], references: [id])
+  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime       @default(now())
+}
+
+model ArrivalNotice {
+  id              Int              @id @default(autoincrement())
+  messageKey      String?          @unique @db.VarChar(255)
+  type            String           @default("ARRIVAL_NOTICE")
+  shipment        String           @unique @db.VarChar(255)
+  subject         String?          @unique @db.VarChar(255)
+  consol          String?          @db.VarChar(255)
+  retries         Int              @default(0)
+  isAnswered      Boolean          @default(false)
+  closed          Boolean          @default(false)
+  attachment      Boolean          @default(false)
+  answeredBy      String?          @db.VarChar(255)
+  ataAt           DateTime?
+  answeredAt      DateTime?
+  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime         @default(now())
+  preAlert        PreAlert?
+  arrivalResponse ArrivalResponse?
+}
+
+model ArrivalResponse {
+  id              Int            @id @default(autoincrement())
+  key             String         @default(uuid())
+  responseA       Boolean        @default(false)
+  responseB       Boolean        @default(false)
+  send            Boolean        @default(false)
+  closed          Boolean        @default(false)
+  json            Json?
+  arrivalNoticeId Int?           @unique
+  arrivalNotice   ArrivalNotice? @relation(fields: [arrivalNoticeId], references: [id])
+  responseAAt     DateTime?
+  responseBAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
