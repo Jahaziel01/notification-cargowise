@@ -4,12 +4,11 @@ import { transporterSenderProduction } from '@/config/smtp';
 import template from '@/html/imap/templates/index';
 import templateUpdate from '@/html/imap/templates/update';
 import { GET_NOTIFICATION_PREALERT, CREATE_PRE_ALERT } from '@/controllers/notification/preAlert';
-import { getAttachmentsBySubject, waitForAttachments } from "./ghost";
+import { getAttachmentsBySubject } from "@/imap/ghost";
 import { MAIL_ERROR, INTERNAL_MAIL, DPTOS_CREDIT } from '@/constants';
-import templateAccounting from "@/html/imap/templates/Accounting";
-import templateLogistics from "@/html/imap/templates/Logistics";
+import templateAccounting from "@/html/imap/templates/accounting";
+import templateLogistics from "@/html/imap/templates/logistics";
 import templateRelease from "@/html/imap/templates/release";
-import { get } from "https";
 
 interface SendNotificationInput {
     to: string;
@@ -24,7 +23,7 @@ interface SendNotificationOutput {
 
 async function sendNotification(data: any): Promise<SendNotificationOutput | undefined> {
     if (data.type === "PRE_ALERT") {
-        const exists = await GET_NOTIFICATION_PREALERT(data.shipment.operation);
+        const exists = await GET_NOTIFICATION_PREALERT(data.shipment.operation)
         if (exists) return;
     };
 
@@ -36,32 +35,31 @@ async function sendNotification(data: any): Promise<SendNotificationOutput | und
 
     const subjectDoc = `DOCUMENTS ${data.type} ${data.shipment.operation}`?.toUpperCase();
 
-    const pdfs = await waitForAttachments(subjectDoc);
-    if (pdfs.length === 0) {
-        //return;
-    }
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(60_000);
+    const pdfs = await getAttachmentsBySubject(subjectDoc);
 
     let ccMails = [];
     if (data.shipment.transportMode === "AIR") {
-        ccMails.push("ediaz@frankleo.com", "harias@frankleo.com", "drodriguez@frankleo.com", "vcoste@frankleo.com", "traffic@frankleo.com");
+        ccMails.push("ediaz@frankleo.com", "harias@frankleo.com", "drodriguez@frankleo.com", "vcoste@frankleo.com", "traffic@frankleo.com, assistancefrankleo@gmail.com");
     }
 
     if (data.shipment.transportMode === "SEA") {
-        ccMails.push("traffic@frankleo.com", "import@frankleo.com");
+        ccMails.push("traffic@frankleo.com", "import@frankleo.com, assistancefrankleo@gmail.com");
     }
 
     if (data.shipment.transportMode === "SEA" && data.shipment.aduanasAllow) {
         ccMails.push("teamaduanas@frankleo.com", "jparedes@frankleo.com", "omorban@frankleo.com", "sbello@frankleo.com", "ybatista@frankleo.com", "jpineda@frankleo.com")
     }
 
-    console.log(data.shipment.aduanasAllow);
+    const fakeTo = ["jmartinez@frankleo.com", "jmartinez@frankleo.com", "jmartinez@frankleo.com", "jmartinez@frankleo.com"];
+    const fakeCC = ["jahazielmartinez80@gmail.com", "jahazielmartinez80@gmail.com"];
 
     try {
         const mailOptions = {
             from: 'notificaciones@frankleo.com',
-            to: data.recipientList, //remove
+            to: data.recipientList,
             cc: ccMails,
-            bcc: 'jahazielmartinez80@gmail.com',
             subject: subject,
             html: await template(data),
             attachments: [

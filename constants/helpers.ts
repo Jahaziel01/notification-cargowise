@@ -31,8 +31,11 @@ function diffInDays(date1: string, date2: string) {
     return d2.diff(d1, "day");
 }
 
-function dateFormater(date: string | Date): string {
-    return dayjs.utc(date).format("dddd, DD MMMM YYYY");
+function dateFormater(date: string | Date): string | null | any {
+    const d = dayjs.utc(date);
+    if (!d.isValid()) return null;
+
+    return d.format("dddd, DD MMMM YYYY");
 }
 
 export { convertToBase64, safeDecode, diffInDays, dateFormater };

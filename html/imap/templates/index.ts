@@ -67,34 +67,40 @@ const template = async (data: any) => {
       </div>` : ''}
       `;
 
-    const listContainers = data?.containers
-        ?.map(
-            (container: any) => `
-      <div style="width: 100%; display: flex; font-size: 10px; gap: 5px; margin-bottom: 8px;">
-        <div style="width: 33%; display: flex; flex-direction: column; gap: 3px;">
-          <p style="font-size: 10px; background-color: rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-            CONTENEDOR
-          </p>
-          <p><span style="font-size: 10px;">${container.container || "-"}</span></p>
-        </div>
+    const rows = data?.containers
+        ?.map((c: any, index: number) => {
+            return `
+      <tr>
+        <td style="border:1px solid #000;">
+          ${data?.shipment?.transportMode === "AIR" ? "LOOSE CARGO" : c.container}
+        </td>
 
-        <div style="width: 33%; display: flex; flex-direction: column; gap: 3px;">
-          <p style="font-size: 10px; background-color: rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-            TIPO
-          </p>
-          <p><span style="font-size: 10px;">${container.volume || "-"} ${container.volumeUnit || "-"}</span></p>
-        </div>
+        <td style="border:1px solid #000; ">
+          ${c.volume || "-"} ${c.volumeUnit || "-"}
+        </td>
 
-        <div style="width: 33%; display: flex; flex-direction: column; gap: 3px;">
-          <p style="font-size: 10px; background-color: rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-            BULTOS
-          </p>
-          <p><span style="font-size: 10px;">${container.weight || "-"} ${container.weightUnit || "-"}</span></p>
-        </div>
-      </div>
-    `
-        )
+        <td style="border:1px solid #000;">
+          ${c.weight || "-"} ${c.weightUnit || "-"}
+        </td>
+      </tr>
+    `;
+        })
         .join("");
+
+    const listContainers = `
+  <table width="100%" cellspacing="0" cellpadding="4" style="font-size:10px; margin-bottom:10px; border-collapse: collapse;">
+
+    <tr>
+      <th style="width:33%; border:1px solid #000; background:#f4f4f4; text-align:start; font-weight:bold;">CONTENEDOR</th>
+      <th style="width:33%; border:1px solid #000; background:#f4f4f4; text-align:start; font-weight:bold;">VOLUMEN</th>
+      <th style="width:33%; border:1px solid #000; background:#f4f4f4; text-align:start; font-weight:bold;">PESO</th>
+    </tr>
+
+    ${rows}
+
+  </table>
+`;
+
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -151,7 +157,7 @@ const template = async (data: any) => {
                     DE MANIFIESTO ADUANAL.***</strong></p>
             ` : ''}
             ${type === 'PRE-ALERTA' ? `
-            <section style="margin-bottom: 20px; border-bottom: 1px solid black;">
+            <section style="margin-bottom: 20px;">
                 <p style="background-color: black; color: white; padding: 4px; margin-bottom: 10px;">DATOS DEL EMBARQUE</p>
                 <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
@@ -171,21 +177,21 @@ const template = async (data: any) => {
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
                         <p
                             style="font-size: 10px; background-color:rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-                            BL / HAWB</p>
+                            HAWB/HBL</p>
                         <p><span style="font-size: 10px;">${data?.shipment?.shipmentNumber}</span></p>
                     </div>
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
                         <p
                             style="font-size: 10px; background-color:rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-                            HAWB/HBL</p>
-                        <p><span style="font-size: 10px;">${data?.shipment?.shipmentNumber}</span></p>
+                            MAWB/MBL</p>
+                        <p><span style="font-size: 10px;">${data?.shipment?.mawb}</span></p>
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
                         <p
                             style="font-size: 10px; background-color:rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-                            PESO</p>
+                            BULTOS</p>
                         <p><span style="font-size: 10px;">${data?.charge?.totalPackages} ${data?.charge?.totalPackagesUnit}</span></p>
                     </div>
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
@@ -205,25 +211,25 @@ const template = async (data: any) => {
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
                         <p
                             style="font-size: 10px; background-color:rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-                            MERCANCÍA RECOGIDA EN</p>
+                            ORIGEN</p>
                         <p><span style="font-size: 10px;">${data?.origins?.origin}</span></p>
                     </div>
                     <div style="width: 50%; font-size: 10px; display: flex; flex-direction: column; gap: 5px;">
                         <p
                             style="font-size: 10px; background-color:rgb(244, 244, 244); padding: 2px; border: 1px solid black; font-weight: bold;">
-                            MERCANCÍA ENTREGADA EN</p>
+                            DESTINO</p>
                         <p><span style="font-size: 10px;">${data?.origins?.destination}</span></p>
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+                <div style="display: flex; width: 100%; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
                     ${listContainers}
                 </div>
             </section>
             `: ''}
             <p style="margin-bottom: 10px; text-align: justify;">Para asegurar que su consulta sea atendida por nuestro equipo de
-                operaciones, por favor siempre copie a
-                <a href="mailto:operaciones@frankleo.com" target="_blank" style="color: black;"> <strong
-                        style="text-decoration: underline;">operaciones@frankleo.com</strong></a>
+                tráfico, por favor siempre copie a
+                <a href="mailto:traffic@frankleo.com" target="_blank" style="color: black;"> <strong
+                        style="text-decoration: underline;">traffic@frankleo.com</strong></a>
                 en todos los correos electrónicos. De esta manera, podemos garantizar una respuesta oportuna a su
                 solicitud.Gracias por su comprensión y paciencia.
             </p>

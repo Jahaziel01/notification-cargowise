@@ -9,7 +9,7 @@ import {
   PARSE_CONSOLIDADO,
   DPTOS_CREDIT
 } from '@/constants';
-import { GET_PENDING_PREALERT_NOTIFICATION, CONFIRM_DESCRIPTION_PRE_ALERT } from '@/controllers/notification/preAlert';
+import { GET_PENDING_PREALERT_NOTIFICATION, CONFIRM_DESCRIPTION_PRE_ALERT, GET_NOTIFICATION_PREALERT } from '@/controllers/notification/preAlert';
 import { UPDATE_ETA_PRE_ALERTS } from '@/controllers/notification/preAlert';
 import { sendNotificationError, sendReport } from '@/imap';
 import dayjs from "dayjs";
@@ -18,7 +18,7 @@ import xmlParser from '@/data/parse';
 import isOnline from 'is-online';
 import { ANALYZE_TEXT, LAST_MESSAGE_TEXT } from '@/controllers/openIA';
 import dotenv from "dotenv";
-import { UPDATE_ARRIVAL_RESPONSE } from '@/controllers/notification/arrivalNotice';
+import { CREATE_ARRIVAL_NOTICE, UPDATE_ARRIVAL_RESPONSE } from '@/controllers/notification/arrivalNotice';
 import { uploadPdfFromBuffer } from '@/controllers/supebase';
 
 dotenv.config();
@@ -163,9 +163,7 @@ async function processMessage(msg: ImapMessage) {
     const hasNotificationReminder = NOTIFICATION_REMINDER.some(
       (key) => subject.includes(key.toUpperCase())
     );
-    const senderAllowed = !DOMAINS_NOT_ALLOWED.some((domain) =>
-      sender.includes(domain)
-    );
+
     const hasReportKey = REPORTS_KEY.some(
       (key) => subject.includes(key.toUpperCase()) || body.includes(key.toUpperCase())
     );
@@ -173,27 +171,39 @@ async function processMessage(msg: ImapMessage) {
     // 1️⃣ WAITING FOR FILES XML
     if (hasNotificationKeyword && isXmlFile && isAttachment) {
       try {
-        const notification = { subject: "", message: "" }; //await GET_NOTIFICATION(subject);
-
-        if (notification?.subject) {
-          await sendNotificationError({
-            subject: notification.subject,
-            data: notification.message,
-          });
-          if (uid) markAsRead(uid);
-          return;
-        }
-        console.log("✅ Processing XML:", subject);
-
+        
         const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
         const xmlInfo = await parser.parseStringPromise(file.content);
+        
+        /**  */
+        const nameOfFile = file?.name?.split(".")[0] || "";
+        const exists = await GET_NOTIFICATION_PREALERT(nameOfFile);
+        
+        if (exists) {
+          if (uid) removeFlags(uid);
+          return;
+        };
+        
+        console.log("✅ Processing XML:", subject);
+
         await xmlParser(xmlInfo, type);
 
-        if (uid) markAsRead(uid);
+        if (uid) removeFlags(uid);
       } catch (err) {
         console.error("❌ Error processing XML:", err);
       }
     };
+
+    /** 
+    if (subject.includes("Consol")) {
+      const consol = PARSE_CONSOLIDADO(subject);
+
+      await CREATE_ARRIVAL_NOTICE({
+        consol: consol?.[1] || "",
+        ataAt: new Date(),
+      });
+    }
+      */
 
     //WORKING
     if (subject.includes("SOLICITUD DE LIBERACIÓN // BL SNTG25058137")) {
@@ -216,14 +226,25 @@ async function processMessage(msg: ImapMessage) {
     }
 
     // 2️⃣ WAITING FOR RESPONSE PRE-ALERTS
-    if (hasNotificationReminder && isReply && senderAllowed) {
+
+    if (hasNotificationReminder && isReply) {
       const allNotifications = await GET_PENDING_PREALERT_NOTIFICATION();
+      const senderIsAllowed = !DOMAINS_NOT_ALLOWED.some((domain) =>
+        sender.includes(domain)
+      );
+
+      console.log("senderIsAllowed", senderIsAllowed);
       if (!Array.isArray(allNotifications) || allNotifications.length === 0) return;
+      if (!senderIsAllowed) {
+        if (uid) markAsRead(uid);
+        return
+      };
 
       const dateReceived = new Date(parsed?.date as Date)?.toISOString();
       const uniqueNotifications = Array.from(
         new Map(allNotifications.map((n: any) => [n.id, n])).values()
       );
+
 
       await Promise.all(
         uniqueNotifications.map(async (notification) => {
@@ -335,86 +356,120 @@ async function getAttachmentsBySubject(targetSubject: string) {
     const imap = new Imap(imapConfig);
     const pdfAttachments: { filename: string; content: Buffer }[] = [];
 
+    console.log("Conectando IMAP...");
+
     imap.once("ready", () => {
+      console.log("IMAP listo");
+
       imap.openBox("[Gmail]/Todos", false, (err) => {
         if (err) return reject(err);
 
         const today = dayjs().format("DD-MMM-YYYY");
         const searchCriteria = ["UNSEEN", ["ON", today]];
-        const fetchOptions = { bodies: "", struct: true };
+        const fetchOptions = { bodies: "" }; // leer todo el MIME
+
+        console.log("Buscando correos:", searchCriteria);
 
         imap.search(searchCriteria, (err, results) => {
           if (err) return reject(err);
+
+          console.log("Resultados de búsqueda:", results);
+
           if (!results || results.length === 0) {
+            console.log("No hay correos");
             imap.end();
             return resolve([]);
           }
 
           const f = imap.fetch(results, fetchOptions);
 
-          f.on("message", (msg: ImapMessage) => {
+          f.on("message", (msg, seqno) => {
+            console.log(`📩 Procesando mensaje #${seqno}`);
+
+            let fullBody: Buffer[] = [];
+            let totalBytes = 0;
+
             msg.on("body", (stream) => {
-              simpleParser(stream as any, (err, parsed) => {
-                if (err || !parsed) return;
-
-                const subject = parsed.subject || "";
-                const attachments = parsed.attachments || [];
-
-                if (subject.includes(targetSubject)) {
-                  for (const attachment of attachments) {
-                    const name = attachment.filename?.toLowerCase() || "";
-                    if (name.endsWith(".pdf") && attachment.content) {
-                      pdfAttachments.push({
-                        filename: attachment.filename!,
-                        content: attachment.content,
-                      });
-                    }
-                  }
-                }
+              stream.on("data", (chunk) => {
+                fullBody.push(chunk);
+                totalBytes += chunk.length;
               });
             });
 
+            msg.once("end", async () => {
+              console.log(`Fin mensaje #${seqno}, tamaño: ${totalBytes} bytes`);
+
+              if (totalBytes === 0) return;
+
+              try {
+                const fullMime = Buffer.concat(fullBody);
+                const parsed = await simpleParser(fullMime);
+
+                // -------- FIX DEFINITIVO 🔥 ----------
+                const clean = (str: string) =>
+                  str.replace(/\s+/g, " ").trim().toUpperCase();
+
+                const subjectClean = clean(parsed.subject || "");
+                const targetClean = clean(targetSubject);
+
+                console.log("Subject limpio:", subjectClean);
+                console.log("Target limpio:", targetClean);
+
+                if (!subjectClean.includes(targetClean)) {
+                  console.log("❌ El subject NO coincide. Se ignora este correo.");
+                  return;
+                }
+
+                console.log("✔ Subject coincide. Adjuntos encontrados:", parsed.attachments.length);
+
+                for (const att of parsed.attachments) {
+                  if (att.filename?.toLowerCase().endsWith(".pdf")) {
+                    console.log(`✔ Agregando PDF: ${att.filename} (${att.content.length} bytes)`);
+
+                    pdfAttachments.push({
+                      filename: att.filename,
+                      content: att.content,
+                    });
+                  } else {
+                    console.log(`Adjunto ignorado: ${att.filename}`);
+                  }
+                }
+
+              } catch (err) {
+                console.error("Error al parsear MIME:", err);
+              }
+            });
+
             msg.once("attributes", (attrs) => {
-              const { uid } = attrs;
-              imap.addFlags(uid, ["\\Seen"], () => { });
+              imap.addFlags(attrs.uid, ["\\Seen"], () => { });
             });
           });
 
-          f.once("error", (err) => reject(err));
-          f.once("end", () => imap.end());
+          f.once("error", (err) => {
+            console.error("Error en fetch:", err);
+            reject(err);
+          });
+
+          f.once("end", () => {
+            console.log("✔ Finalizó fetch. Cerrando IMAP...");
+            imap.end();
+          });
         });
       });
     });
 
-    imap.once("error", (err) => reject(err));
-    imap.once("end", () => resolve(pdfAttachments));
+    imap.once("error", (err) => {
+      console.error("Error IMAP:", err);
+      reject(err);
+    });
+
+    imap.once("end", () => {
+      console.log("IMAP cerrado. Total PDFs:", pdfAttachments.length);
+      resolve(pdfAttachments);
+    });
+
     imap.connect();
   });
-}
-
-export async function waitForAttachments(subject: string, maxAttempts = 2, delayMs = 2 * 60 * 1000) {
-  let attempt = 0;
-  let pdfs: { filename: string; content: Buffer }[] = [];
-
-  while (attempt < maxAttempts) {
-    attempt++;
-
-    try {
-      pdfs = await getAttachmentsBySubject(subject);
-
-      if (pdfs.length > 0) {
-        return pdfs;
-      }
-    } catch (err) {
-      console.error(err);
-      break;
-    }
-
-    if (attempt < maxAttempts) {
-      await new Promise((res) => setTimeout(res, delayMs));
-    }
-  }
-  return pdfs;
 }
 
 setInterval(async () => {

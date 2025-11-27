@@ -26,7 +26,7 @@ const templateUpdate = (data: any): string => {
     <div style="margin-top: 20px; margin-bottom: 20px;"></div>
     <main style="width: 600px;">
         <section>
-            <p style="margin-bottom: 10px;"> Cordiarles saludos.</p>
+            <p style="margin-bottom: 10px; text-transform: uppercase;"> Cordiarles saludos.</p>
            <p style="margin-bottom: 1px; text-transform: uppercase;">
                 Le recordamos que la descripción de esta pre-alerta (enviado el <strong>${data.createdAt.template}</strong>) aún no ha sido confirmada.  
                     </p>

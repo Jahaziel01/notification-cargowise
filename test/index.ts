@@ -6,14 +6,11 @@ import template from "@/html/imap/templates/index";
 import { Request, Response } from 'express';
 import { transporterSender, transporterSenderProduction } from '@/config/smtp';
 import { PrismaClient } from '@/generated/prisma/client'
-import { waitForAttachments } from '@/imap/ghost';
-import puppeteer from "puppeteer";
-import { sendNotificationError } from '@/imap';
 
 const prisma = new PrismaClient();
 
 async function fileTest() {
-    const file = "./test/SIS250913663.xml";
+    const file = "./test/SIA25116017.xml";
 
     try {
         const filePath = path.resolve(file);

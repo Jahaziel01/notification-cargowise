@@ -39,7 +39,7 @@ SCHEDULE_ARRIVAL_NOTICE(); //to reminder
 async function testPdfUpload() {
     try {
         // 1. Obtener los PDFs del correo
-        const attachments = await getAttachmentsBySubject("DOCUMENTS PRE_ALERT SIS250913663");
+        const attachments = await getAttachmentsBySubject("DOCUMENTS PRE_ALERT SIS251114137");
 
         console.log("Raw attachments:", attachments);
 
@@ -99,7 +99,7 @@ app.get('/api/test/report', reportTest);
 app.post('/api/test/message', messageTest);
 app.post('/api/test/notification', notificationTest);
 
-///xmlParser("", "PRE_ALERT").then(() => { console.log("Parser completed"); });
+//xmlParser("", "PRE_ALERT").then(() => { console.log("Parser completed"); });
 
 
 app.listen(3000, () => { });

@@ -1,6 +1,6 @@
 import path from "path";
 import cron from "node-cron";
-import { transporterSender } from "@/config/smtp";
+import { transporterSender, transporterSenderProduction } from "@/config/smtp";
 import templateReminder from "@/html/imap/templates/reminder";
 import { GET_PENDING_PREALERT_NOTIFICATION, UPDATE_RETRIES_PRE_ALERT } from "@/controllers/notification/preAlert";
 
@@ -21,7 +21,7 @@ async function REMINDER_NOTIFICATION_PREALERT() {
                 : [];
 
             const mailOptions = {
-                from: process.env.SMTP_EMAIL,
+                from: 'notificaciones@frankleo.com',
                 to: recipientsArray,
                 cc: ccArray,
                 bcc: process.env.SMTP_BCC,
@@ -39,7 +39,7 @@ async function REMINDER_NOTIFICATION_PREALERT() {
             };
 
             await UPDATE_RETRIES_PRE_ALERT(notification.id);
-            await transporterSender.sendMail(mailOptions);
+            await transporterSenderProduction.sendMail(mailOptions);
         })
     );
 }
@@ -52,12 +52,10 @@ cron.schedule("30 15 * * *", async () => () => { }, {
     timezone: "America/Santo_Domingo",
 });
 
-//REMINDER_NOTIFICATION().then((data) => console.log(data));
-
 /**
 cron.schedule("* * * * *", async () => await REMINDER_NOTIFICATION(), {
     timezone: "America/Santo_Domingo",
 });
  */
 
-///setInterval(REMINDER_NOTIFICATION_PREALERT, 2 * 60 * 1000);
+//setInterval(REMINDER_NOTIFICATION_PREALERT, 4 * 60 * 1000);

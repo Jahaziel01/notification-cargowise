@@ -35,7 +35,8 @@ async function GET_ATA_ARRIVAL_NOTICE({ shipment }: { shipment: string }): Promi
             },
         });
 
-        return arrival?.ataAt ? dateFormater(new Date(arrival.ataAt)) : "";
+      return arrival?.ataAt ? dateFormater(arrival.ataAt) : "";
+
     } catch (error) {
         console.error(error);
         throw error;
